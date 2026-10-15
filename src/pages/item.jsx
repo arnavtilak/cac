@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { getItems, updateItem } from "../data";
 import { photoToDataUrl } from "../image";
 
@@ -11,6 +11,7 @@ export default function ItemPage() {
     const [imageError, setImageError] = useState("");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [imageIndexToDelete, setImageIndexToDelete] = useState(null);
+    const [newName, setNewName] = useState(item?.name ?? "");
     const photoInput = useRef(null);
     const deleteImageDialog = useRef(null);
 
@@ -53,20 +54,11 @@ export default function ItemPage() {
         }
     }
 
-    function handleEditName() {
-        let newName = prompt("Enter a new name for this item:", item.name);
-        if (newName === null) {
-            return; // User cancelled the prompt
-        }
-        newName = newName.trim();
-        if (newName === "") {
-            alert("Name cannot be empty.");
-            return;
-        }
+    function handleEditName(ev) {
+        ev.preventDefault();
         const updatedItem = updateItem(v, { name: newName });
-        if (updatedItem) {
-            setItem(updatedItem);
-        }
+        setItem(updatedItem);
+        document.getElementById("my_modal_3")?.close();
     }
 
     function confirmDeleteImage() {
@@ -97,7 +89,7 @@ export default function ItemPage() {
         <div className="flex-grow flex flex-col items-center relative">
             <header className="w-full max-w-3xl px-4 pt-8 pb-5">
                 <p className="text-sm font-medium text-info">LastLook item</p>
-                <h1 className="mt-1 text-3xl font-bold">{item.name} <button onClick={handleEditName} className="btn btn-warning btn-xs">Edit</button></h1>
+                <h1 className="mt-1 text-3xl font-bold">{item.name} <button onClick={() => document.getElementById('my_modal_3').showModal()} className="btn btn-warning btn-xs">Edit</button></h1>
                 <p className="mt-2 text-sm text-base-content/70">
                     Last seen{" "}
                     <time className="font-medium text-base-content">
@@ -214,6 +206,44 @@ export default function ItemPage() {
                     <button>close</button>
                 </form>
             </dialog>
+            <dialog
+                id="my_modal_3"
+                className="modal"
+                onClose={() => {
+                    setNewName("");
+                }}
+            >
+                <div className="modal-box">
+                    <h3 className="font-bold text-lg">Edit Name</h3>
+                    <form onSubmit={handleEditName} className="mt-4 space-y-4">
+                        <label className="form-control w-full">
+                            <span className="label-text mb-2">New Name</span>
+                            <input
+                                value={newName}
+                                onChange={(event) => {
+                                    setNewName(event.target.value);
+                                }}
+                                type="text"
+                                placeholder="Enter new name"
+                                className="input input-bordered w-full"
+                            />
+                        </label>
+                        <button type="submit" className="btn btn-info">
+                            Save
+                        </button>
+                    </form>
+                    <div className="modal-action">
+                        <form method="dialog">
+                            <button type="submit" className="btn">Close</button>
+                        </form>
+                    </div>
+                </div>
+            </dialog>
+            <nav className="p-5 space-x-3 flex justify-center w-full bg-base-300">
+                <Link to="/">
+                    <button className="btn btn-ghost">Home</button>
+                </Link>
+            </nav>
         </div>
     );
 }

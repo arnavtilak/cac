@@ -60,7 +60,6 @@ export default function HomePage() {
 
     return (
         <div className="bg-base-100 flex-grow flex flex-col justify-center items-center">
-            <div className="text-xl font-bold bg-base-300 w-full p-5 text-center">LastLook</div>
             <div className="text-xl font-bold m-5 p-1">Your last items:</div>
             <div className="space-y-5 px-5">
                 {items.map((item) =>
