@@ -1,9 +1,11 @@
 import { Link, Route, Routes } from 'react-router'
 import HomePage from './pages/home'
 import ItemPage from './pages/item'
+import Home2 from './pages/home2'
 
 const ROUTES = [
-  { path: "/", element: <HomePage /> },
+  { path: "/old", element: <HomePage /> },
+  { path: "/", element: <Home2 /> },
   { path: "/item/:v", element: <ItemPage /> },
 ]
 
@@ -18,7 +20,7 @@ export default function Layout() {
         {ROUTES.map((r) => <Route key={r.path} path={r.path} element={r.element} />)}
       </Routes>
       {/* Header */}
-      
+
     </div>
   )
 }

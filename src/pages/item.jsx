@@ -87,6 +87,9 @@ export default function ItemPage() {
 
     return (
         <div className="flex-grow flex flex-col items-center relative">
+            <div>
+                <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d26555.860112968556!2d-117.76819199999998!3d33.69646135!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sus!4v1792031729705!5m2!1sen!2sus" width="600" height="450" style={{ border: 0 }} allowFullScreen="" loading="lazy" referrerPolicy="strict-origin-when-cross-origin"></iframe>
+            </div>
             <header className="w-full max-w-3xl px-4 pt-8 pb-5">
                 <p className="text-sm font-medium text-info">LastLook item</p>
                 <h1 className="mt-1 text-3xl font-bold">{item.name} <button onClick={() => document.getElementById('my_modal_3').showModal()} className="btn btn-warning btn-xs">Edit</button></h1>
