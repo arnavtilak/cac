@@ -53,6 +53,22 @@ export default function ItemPage() {
         }
     }
 
+    function handleEditName() {
+        let newName = prompt("Enter a new name for this item:", item.name);
+        if (newName === null) {
+            return; // User cancelled the prompt
+        }
+        newName = newName.trim();
+        if (newName === "") {
+            alert("Name cannot be empty.");
+            return;
+        }
+        const updatedItem = updateItem(v, { name: newName });
+        if (updatedItem) {
+            setItem(updatedItem);
+        }
+    }
+
     function confirmDeleteImage() {
         if (imageIndexToDelete === null || item.img.length <= 1) {
             deleteImageDialog.current?.close();
@@ -78,10 +94,10 @@ export default function ItemPage() {
 
 
     return (
-        <div className="flex-grow flex flex-col items-center">
+        <div className="flex-grow flex flex-col items-center relative">
             <header className="w-full max-w-3xl px-4 pt-8 pb-5">
                 <p className="text-sm font-medium text-info">LastLook item</p>
-                <h1 className="mt-1 text-3xl font-bold">{item.name}</h1>
+                <h1 className="mt-1 text-3xl font-bold">{item.name} <button onClick={handleEditName} className="btn btn-warning btn-xs">Edit</button></h1>
                 <p className="mt-2 text-sm text-base-content/70">
                     Last seen{" "}
                     <time className="font-medium text-base-content">
@@ -119,7 +135,7 @@ export default function ItemPage() {
                     </li>
                 ))}
             </ul>
-            <button className="btn btn-info btn-circle" onClick={() => document.getElementById('my_modal_2').showModal()}>
+            <button className="btn btn-info btn-circle absolute bottom-8 right-5" onClick={() => document.getElementById('my_modal_2').showModal()}>
                 +
             </button>
             {/* Open the modal using document.getElementById('ID').showModal() method */}
