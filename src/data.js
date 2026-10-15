@@ -8,8 +8,18 @@ export const ITEMS = [
 
 const STORAGE_KEY = "lastlook-items";
 
+// Each photo is stored as { src, location: { lat, lng, accuracy } | null, timestamp }.
+// Older records stored photos as plain URL strings, so convert those on read.
+function normalizeItem(item) {
+    return {
+        ...item,
+        img: (item.img ?? []).map((img) => (typeof img === "string" ? { src: img } : img)),
+        date: new Date(item.date),
+    };
+}
+
 function getInitialItems() {
-    return ITEMS.map((item) => ({ ...item, date: new Date(item.date) }));
+    return ITEMS.map(normalizeItem);
 }
 
 export function getItems() {
@@ -21,7 +31,7 @@ export function getItems() {
     try {
         const items = JSON.parse(storedItems);
         return Array.isArray(items)
-            ? items.map((item) => ({ ...item, date: new Date(item.date) }))
+            ? items.map(normalizeItem)
             : getInitialItems();
     } catch {
         return getInitialItems();
@@ -34,7 +44,7 @@ function saveItems(items) {
 }
 
 export function addItem(item) {
-    return saveItems([...getItems(), item]);
+    return saveItems([...getItems(), normalizeItem(item)]);
 }
 
 export function updateItem(name, updates) {

@@ -16,7 +16,7 @@ export default function Home2() {
 
         <div className="grid grid-cols-4 gap-4">
             {
-                KEYS.map((key) => (<Link key={key.name} to={`/item/Goggles`}>
+                KEYS.map((key) => (<Link key={key.name} to={`/item/${key.name}`}>
                     <div>{key.icon} {key.name}</div>
                 </Link>))
             }

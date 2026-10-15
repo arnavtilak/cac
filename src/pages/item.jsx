@@ -1,19 +1,54 @@
 import { useRef, useState } from "react";
-import { Link, useParams } from "react-router";
-import { getItems, updateItem } from "../data";
+import { Link, useNavigate, useParams } from "react-router";
+import { addItem, getItems, updateItem } from "../data";
 import { photoToDataUrl } from "../image";
+import { getCurrentLocation } from "../location";
 
 export default function ItemPage() {
     const { v } = useParams();
-    const [item, setItem] = useState(() => getItems().find((i) => i.name === v));
+    // key resets the page state when the URL changes (e.g. after renaming)
+    return <ItemView key={v} v={v} />;
+}
+
+function ItemView({ v }) {
+    const navigate = useNavigate();
+    // items with no saved record yet start out empty so photos can still be added
+    const [item, setItem] = useState(
+        () => getItems().find((i) => i.name === v) ?? { name: v, img: [], date: null }
+    );
     const [imageUrl, setImageUrl] = useState("");
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [imageError, setImageError] = useState("");
+    const [cameraError, setCameraError] = useState("");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [imageIndexToDelete, setImageIndexToDelete] = useState(null);
-    const [newName, setNewName] = useState(item?.name ?? "");
+    const [newName, setNewName] = useState(item.name);
     const photoInput = useRef(null);
+    const cameraInput = useRef(null);
     const deleteImageDialog = useRef(null);
+
+    // photos are stored newest first, so this is the most recent stored position
+    const lastLocation = item.img.find((img) => img.location)?.location;
+
+    async function saveImage(source) {
+        const [src, location] = await Promise.all([
+            typeof source === "string" ? source : photoToDataUrl(source),
+            getCurrentLocation(),
+        ]);
+        const timestamp = new Date();
+        const updates = {
+            img: [{ src, location, timestamp: timestamp.toISOString() }, ...item.img],
+            date: timestamp,
+        };
+
+        let updatedItem = updateItem(v, updates);
+        if (!updatedItem) {
+            // first record for this item
+            updatedItem = { name: v, ...updates };
+            addItem(updatedItem);
+        }
+        setItem(updatedItem);
+    }
 
     async function addImage(event) {
         event.preventDefault();
@@ -30,16 +65,7 @@ export default function ItemPage() {
 
         setIsAddingImage(true);
         try {
-            const newImage = selectedPhoto
-                ? await photoToDataUrl(selectedPhoto)
-                : imageUrl.trim();
-            const updatedItem = updateItem(v, {
-                img: [newImage, ...item.img],
-                date: new Date(),
-            });
-            if (updatedItem) {
-                setItem(updatedItem);
-            }
+            await saveImage(selectedPhoto ?? imageUrl.trim());
             setImageUrl("");
             setSelectedPhoto(null);
             setImageError("");
@@ -54,11 +80,43 @@ export default function ItemPage() {
         }
     }
 
+    async function addCameraPhoto(event) {
+        const photo = event.target.files?.[0];
+        event.target.value = "";
+        if (!photo) {
+            return;
+        }
+
+        setCameraError("");
+        setIsAddingImage(true);
+        try {
+            await saveImage(photo);
+        } catch {
+            setCameraError("Could not save this photo. Try again.");
+        } finally {
+            setIsAddingImage(false);
+        }
+    }
+
+    function openAddImage() {
+        // on phones, go straight to the camera; otherwise show the upload dialog
+        const isPhone = window.matchMedia("(pointer: coarse)").matches;
+        if (isPhone && cameraInput.current) {
+            cameraInput.current.click();
+        } else {
+            document.getElementById("my_modal_2").showModal();
+        }
+    }
+
     function handleEditName(ev) {
         ev.preventDefault();
-        const updatedItem = updateItem(v, { name: newName });
-        setItem(updatedItem);
+        const name = newName.trim();
+        if (!name) {
+            return;
+        }
+        updateItem(v, { name });
         document.getElementById("my_modal_3")?.close();
+        navigate(`/item/${name}`, { replace: true });
     }
 
     function confirmDeleteImage() {
@@ -76,45 +134,69 @@ export default function ItemPage() {
         deleteImageDialog.current?.close();
     }
 
-    if (!item) {
-        return (
-            <div className="flex-grow flex flex-col items-center">
-                <div className="m-1">Item not found</div>
-            </div>
-        );
-    }
-
 
     return (
         <div className="flex-grow flex flex-col items-center relative">
-            <div>
-                <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d26555.860112968556!2d-117.76819199999998!3d33.69646135!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sus!4v1792031729705!5m2!1sen!2sus" width="600" height="450" style={{ border: 0 }} allowFullScreen="" loading="lazy" referrerPolicy="strict-origin-when-cross-origin"></iframe>
-            </div>
             <header className="w-full max-w-3xl px-4 pt-8 pb-5">
                 <p className="text-sm font-medium text-info">LastLook item</p>
                 <h1 className="mt-1 text-3xl font-bold">{item.name} <button onClick={() => document.getElementById('my_modal_3').showModal()} className="btn btn-warning btn-xs">Edit</button></h1>
                 <p className="mt-2 text-sm text-base-content/70">
-                    Last seen{" "}
-                    <time className="font-medium text-base-content">
-                        {item.date.toLocaleDateString(undefined, {
-                            month: "long",
-                            day: "numeric",
-                            year: "numeric",
-                        })}
-                    </time>
+                    {item.date ? (
+                        <>
+                            Last seen{" "}
+                            <time className="font-medium text-base-content">
+                                {item.date.toLocaleDateString(undefined, {
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                })}
+                            </time>
+                        </>
+                    ) : (
+                        "No records yet"
+                    )}
                 </p>
+                <div className="mt-5">
+                    {lastLocation ? (
+                        <iframe
+                            title={`Map of where ${item.name} was last seen`}
+                            src={`https://maps.google.com/maps?q=${lastLocation.lat},${lastLocation.lng}&z=17&output=embed`}
+                            className="h-72 w-full rounded-box"
+                            style={{ border: 0 }}
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                        ></iframe>
+                    ) : (
+                        <div className="flex h-24 w-full items-center justify-center rounded-box bg-base-200 text-sm text-base-content/70">
+                            No location saved yet
+                        </div>
+                    )}
+                </div>
+                {cameraError && <p role="alert" className="mt-3 text-sm text-error">{cameraError}</p>}
                 <h2 className="mt-7 border-b border-base-300 pb-2 text-lg font-semibold">
                     Saved locations
                 </h2>
             </header>
-            <ul className="flex w-full max-w-3xl flex-col gap-4 px-4">
+            <ul className="flex w-full max-w-3xl flex-col gap-4 px-4 pb-24">
+                {item.img.length === 0 && (
+                    <li className="py-8 text-center text-sm text-base-content/70">
+                        No photos yet. Press + to add one.
+                    </li>
+                )}
                 {item.img.map((img, index) => (
-                    <li key={`${img}-${index}`} className="relative w-full">
+                    <li key={`${img.src}-${index}`} className="relative w-full">
                         <img
-                            src={img}
+                            src={img.src}
                             alt={`${item.name}, saved location ${index + 1}`}
                             className="max-h-[32rem] w-full bg-base-200 object-contain"
                         />
+                        <p className="mt-1 text-xs text-base-content/70">
+                            {img.timestamp ? new Date(img.timestamp).toLocaleString() : "Unknown time"}
+                            {" · "}
+                            {img.location
+                                ? `${img.location.lat.toFixed(5)}, ${img.location.lng.toFixed(5)}`
+                                : "No location"}
+                        </p>
                         <button
                             type="button"
                             className="btn btn-error btn-sm absolute right-3 top-3"
@@ -130,9 +212,18 @@ export default function ItemPage() {
                     </li>
                 ))}
             </ul>
-            <button className="btn btn-info btn-circle absolute bottom-8 right-5" onClick={() => document.getElementById('my_modal_2').showModal()}>
-                +
+            <button className="btn btn-info btn-circle absolute bottom-24 right-5" onClick={openAddImage} disabled={isAddingImage}>
+                {isAddingImage ? <span className="loading loading-spinner loading-sm"></span> : "+"}
             </button>
+            {/* capture opens the camera on phones; browsers without one fall back to a file picker */}
+            <input
+                ref={cameraInput}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={addCameraPhoto}
+            />
             {/* Open the modal using document.getElementById('ID').showModal() method */}
             <dialog
                 id="my_modal_2"
@@ -213,7 +304,7 @@ export default function ItemPage() {
                 id="my_modal_3"
                 className="modal"
                 onClose={() => {
-                    setNewName("");
+                    setNewName(item.name);
                 }}
             >
                 <div className="modal-box">
