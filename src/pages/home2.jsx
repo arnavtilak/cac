@@ -12,7 +12,7 @@ const KEYS = [
 
 export default function Home2() {
     return <div>
-        <h1 className="text-center text-xl m-20">Find MY</h1>
+        <h1 className="text-center text-xl m-20"></h1>
 
         <div className="grid grid-cols-4 gap-4">
             {
