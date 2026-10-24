@@ -2,10 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { addItem, getItems, updateItem } from "../data";
 import { photoToBlob } from "../image";
-import { getCurrentLocation } from "../location";
+import { requestLocation, waitForLocation } from "../location";
 import { deletePhoto, loadPhoto, savePhoto } from "../photos";
 import { readPhotoInfo } from "../exif";
 import { ArrowLeftIcon, CameraIcon, PencilIcon, PinIcon, TrashIcon } from "../icons";
+
+// shown when a photo is saved without a location, explaining why and how to fix it
+const LOCATION_PROBLEMS = {
+    blocked: "Photo saved without a location because location is turned off for this site. iPhone: Settings → Privacy & Security → Location Services → Safari Websites (or Chrome) → While Using. Android: tap the icon left of the web address → Permissions → Location → Allow.",
+    slow: "Photo saved without a location because your phone took too long to find it. Try again with Wi-Fi on, or near a window.",
+    unavailable: "Photo saved without a location because your phone couldn't find where you are. Check that Location Services is on, then try again.",
+    unsupported: "Photo saved without a location because this browser can't share your location.",
+};
 
 export default function ItemPage() {
     const { v } = useParams();
@@ -20,6 +28,8 @@ function ItemView({ v }) {
         () => getItems().find((i) => i.name === v) ?? { name: v, img: [], date: null }
     );
     const [photoError, setPhotoError] = useState("");
+    // why the last photo was saved without a location ("blocked", "slow", ...), or null
+    const [locationProblem, setLocationProblem] = useState(null);
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [imageIndexToDelete, setImageIndexToDelete] = useState(null);
     const [newName, setNewName] = useState(item.name);
@@ -34,13 +44,28 @@ function ItemView({ v }) {
     // photos are stored newest first, so this is the most recent stored position
     const lastLocation = item.img.find((img) => img.location)?.location;
 
+    // Finds where you are now, using the lookup started when you tapped the camera if there is one.
+    async function findCurrentLocation() {
+        const early = locationRequest.current;
+        locationRequest.current = null;
+        // the clock only starts now that the photo is chosen, so time spent in the camera doesn't count
+        const first = early ? await waitForLocation(early, 10000) : null;
+        if (first?.location) {
+            return first;
+        }
+        // the early lookup can come back empty while the camera covers the page,
+        // so ask once more now that the page is showing again
+        return waitForLocation(requestLocation(), 15000);
+    }
+
     // photoPlace is { location, takenAt } from the photo itself, or null to use where you are now
     async function saveImage(photo, photoPlace) {
-        const [blob, location] = await Promise.all([
+        const [blob, found] = await Promise.all([
             photoToBlob(photo),
-            photoPlace ? photoPlace.location : (locationRequest.current ?? getCurrentLocation()),
+            photoPlace ? { location: photoPlace.location, problem: null } : findCurrentLocation(),
         ]);
-        locationRequest.current = null;
+        const location = found.location;
+        setLocationProblem(found.problem);
         // the photo goes in IndexedDB; the item only keeps its id
         const id = crypto.randomUUID();
         await savePhoto(id, blob);
@@ -72,6 +97,7 @@ function ItemView({ v }) {
         }
 
         setPhotoError("");
+        setLocationProblem(null);
         const info = await readPhotoInfo(photo);
         if (info.location) {
             // the photo knows where it was taken, so ask which location to use
@@ -183,6 +209,12 @@ function ItemView({ v }) {
                     )}
                 </div>
                 {photoError && <p role="alert" className="mt-3 text-sm text-error">{photoError}</p>}
+                {locationProblem && (
+                    <div role="alert" className="alert alert-warning alert-soft mt-3 text-sm">
+                        <PinIcon className="size-5 shrink-0" />
+                        <span>{LOCATION_PROBLEMS[locationProblem]}</span>
+                    </div>
+                )}
                 <h2 className="mt-8 flex items-center gap-2 text-lg font-bold">
                     Saved locations
                     <span className="badge badge-sm badge-neutral">{item.img.length}</span>
@@ -232,7 +264,7 @@ function ItemView({ v }) {
                 onClick={() => {
                     // start finding your location now, while you take or pick the photo,
                     // so it's usually ready by the time the photo is chosen
-                    locationRequest.current = getCurrentLocation();
+                    locationRequest.current = requestLocation();
                     photoInput.current?.click();
                 }}
                 disabled={isAddingImage}

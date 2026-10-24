@@ -1,24 +1,40 @@
-// Resolves to { lat, lng, accuracy }, or null if location is unavailable, denied, or too slow.
-export function getCurrentLocation() {
+// Asks the device where it is. Resolves to { location, problem }:
+// location is { lat, lng, accuracy } or null, and problem says why there's no location:
+// "blocked" (permission denied), "unavailable" (couldn't get a fix), "slow", or "unsupported".
+export function requestLocation() {
     return new Promise((resolve) => {
         if (!navigator.geolocation) {
-            resolve(null);
+            resolve({ location: null, problem: "unsupported" });
             return;
         }
 
-        // the browser's own timeout doesn't count time spent on the "Allow location?" prompt,
-        // so an ignored prompt would wait forever. Give up after 15 seconds no matter what.
-        // (a promise only resolves once, so whichever finishes first wins)
-        setTimeout(() => resolve(null), 15000);
-
         navigator.geolocation.getCurrentPosition(
             (position) => resolve({
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-                accuracy: position.coords.accuracy,
+                location: {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                },
+                problem: null,
             }),
-            () => resolve(null),
+            (error) => resolve({
+                location: null,
+                problem: error.code === error.PERMISSION_DENIED ? "blocked"
+                    : error.code === error.TIMEOUT ? "slow"
+                    : "unavailable",
+            }),
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
         );
     });
+}
+
+// Waits at most ms for a location request, then gives up.
+// The browser's own timeout doesn't count time spent on the "Allow location?" prompt,
+// so without this an ignored prompt would wait forever.
+export function waitForLocation(request, ms) {
+    const giveUp = new Promise((resolve) => {
+        setTimeout(() => resolve({ location: null, problem: "slow" }), ms);
+    });
+    // race settles with whichever promise finishes first
+    return Promise.race([request, giveUp]);
 }
