@@ -33,13 +33,10 @@ function ItemView({ v }) {
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [imageIndexToDelete, setImageIndexToDelete] = useState(null);
     const [newName, setNewName] = useState(item.name);
-    // a photo that has its own location, waiting for you to pick which location to save
-    const [pendingPhoto, setPendingPhoto] = useState(null);
     const photoInput = useRef(null);
     // location lookup started when the camera button is tapped
     const locationRequest = useRef(null);
     const deleteImageDialog = useRef(null);
-    const placeDialog = useRef(null);
 
     // photos are stored newest first, so this is the most recent stored position
     const lastLocation = item.img.find((img) => img.location)?.location;
@@ -58,18 +55,17 @@ function ItemView({ v }) {
         return waitForLocation(requestLocation(), 15000);
     }
 
-    // photoPlace is { location, takenAt } from the photo itself, or null to use where you are now
-    async function saveImage(photo, photoPlace) {
+    async function saveImage(photo, photoInfo) {
         const [blob, found] = await Promise.all([
             photoToBlob(photo),
-            photoPlace ? { location: photoPlace.location, problem: null } : findCurrentLocation(),
+            findCurrentLocation(),
         ]);
         const location = found.location;
         setLocationProblem(found.problem);
         // the photo goes in IndexedDB; the item only keeps its id
         const id = crypto.randomUUID();
         await savePhoto(id, blob);
-        const timestamp = photoPlace?.takenAt ?? new Date();
+        const timestamp = photoInfo?.takenAt ?? new Date();
         // a photo from your library can be older than ones already saved,
         // so sort to keep newest first (ISO dates sort correctly as text)
         const img = [{ id, location, timestamp: timestamp.toISOString() }, ...item.img]
@@ -99,30 +95,18 @@ function ItemView({ v }) {
         setPhotoError("");
         setLocationProblem(null);
         const info = await readPhotoInfo(photo);
-        if (info.location) {
-            // the photo knows where it was taken, so ask which location to use
-            setPendingPhoto({ file: photo, ...info });
-            placeDialog.current?.showModal();
-            return;
-        }
-        await saveWithSpinner(photo, null);
+        await saveWithSpinner(photo, info);
     }
 
-    async function saveWithSpinner(photo, photoPlace) {
+    async function saveWithSpinner(photo, photoInfo) {
         setIsAddingImage(true);
         try {
-            await saveImage(photo, photoPlace);
+            await saveImage(photo, photoInfo);
         } catch {
             setPhotoError("Could not save this photo. Try again.");
         } finally {
             setIsAddingImage(false);
         }
-    }
-
-    function choosePlace(usePhotoLocation) {
-        const pending = pendingPhoto;
-        placeDialog.current?.close();
-        saveWithSpinner(pending.file, usePhotoLocation ? pending : null);
     }
 
     function handleEditName(ev) {
@@ -283,56 +267,6 @@ function ItemView({ v }) {
                 className="hidden"
                 onChange={addPhoto}
             />
-            <dialog
-                ref={placeDialog}
-                className="modal"
-                // closing without choosing (Cancel, Esc, tapping outside) skips this photo
-                onClose={() => setPendingPhoto(null)}
-            >
-                <div className="modal-box max-w-sm">
-                    <h3 className="text-lg font-bold">Which location should we save?</h3>
-                    <p className="py-2 text-sm text-base-content/70">This photo has the spot it was taken saved inside it.</p>
-                    {pendingPhoto && (
-                        <div className="mt-2 flex flex-col gap-3">
-                            <button
-                                type="button"
-                                className="btn btn-primary h-auto justify-start gap-3 py-3 text-left"
-                                onClick={() => choosePlace(true)}
-                            >
-                                <PinIcon className="size-5 shrink-0" />
-                                <span>
-                                    <span className="block">Where the photo was taken</span>
-                                    <span className="block text-xs font-normal opacity-70">
-                                        {pendingPhoto.takenAt
-                                            ? `${pendingPhoto.takenAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · `
-                                            : ""}
-                                        {pendingPhoto.location.lat.toFixed(5)}, {pendingPhoto.location.lng.toFixed(5)}
-                                    </span>
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                className="btn h-auto justify-start gap-3 py-3 text-left"
-                                onClick={() => choosePlace(false)}
-                            >
-                                <CameraIcon className="size-5 shrink-0" />
-                                <span>
-                                    <span className="block">Where I am now</span>
-                                    <span className="block text-xs font-normal opacity-70">Use this device's current location</span>
-                                </span>
-                            </button>
-                        </div>
-                    )}
-                    <div className="modal-action">
-                        <button type="button" className="btn btn-ghost" onClick={() => placeDialog.current?.close()}>
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-                <form method="dialog" className="modal-backdrop">
-                    <button>close</button>
-                </form>
-            </dialog>
             <dialog
                 ref={deleteImageDialog}
                 className="modal"
