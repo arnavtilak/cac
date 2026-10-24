@@ -2,15 +2,22 @@ import { useRef, useState } from "react"
 import { Link } from "react-router"
 import { addItem, deleteItem, getItems } from "../data"
 import { PlusIcon, TrashIcon } from "../icons"
+import { emojiKeyboardHint, getSingleEmoji, suggestEmoji } from "../emoji"
 
-// emoji choices in the Add item dialog
-const ICONS = ['🔑', '👛', '💳', '📱', '💻', '🎧', '🕶️', '🎒', '⌚', '🧢', '🎮', '📦']
+// one-tap emoji choices in the Add item dialog
+const QUICK_PICKS = ['🔑', '👛', '💳', '📱', '💻', '🎧', '🎒', '⌚']
+// used when nothing is picked and the name doesn't suggest anything
+const DEFAULT_ICON = '📦'
 
 
 export default function Home2() {
     const [items, setItems] = useState(getItems);
     const [name, setName] = useState("");
-    const [icon, setIcon] = useState(ICONS[0]);
+    const [icon, setIcon] = useState(DEFAULT_ICON);
+    // once you pick an icon yourself, typing the name stops changing it
+    const [pickedIcon, setPickedIcon] = useState(false);
+    const [customEmoji, setCustomEmoji] = useState("");
+    const [emojiError, setEmojiError] = useState("");
     const [addError, setAddError] = useState("");
     const [itemToDelete, setItemToDelete] = useState(null);
     const addDialog = useRef(null);
@@ -23,11 +30,41 @@ export default function Home2() {
         nameInput.current?.focus();
     }
 
+    function handleNameChange(value) {
+        setName(value);
+        setAddError("");
+        if (!pickedIcon) {
+            setIcon(suggestEmoji(value) ?? DEFAULT_ICON);
+        }
+    }
+
+    function pickIcon(choice) {
+        setIcon(choice);
+        setPickedIcon(true);
+        setCustomEmoji("");
+        setEmojiError("");
+    }
+
+    function handleCustomEmojiChange(value) {
+        setCustomEmoji(value);
+        const emoji = getSingleEmoji(value);
+        if (emoji) {
+            setIcon(emoji);
+            setPickedIcon(true);
+            setEmojiError("");
+        } else {
+            setEmojiError(value.trim() ? "Type just one emoji." : "");
+        }
+    }
+
     function handleAdd(event) {
         event.preventDefault();
         const trimmed = name.trim();
         if (!trimmed) {
             setAddError("Enter an item name.");
+            return;
+        }
+        if (emojiError) {
             return;
         }
         // the name is used in the item's URL, so two items can't share one
@@ -101,7 +138,10 @@ export default function Home2() {
             className="modal"
             onClose={() => {
                 setName("");
-                setIcon(ICONS[0]);
+                setIcon(DEFAULT_ICON);
+                setPickedIcon(false);
+                setCustomEmoji("");
+                setEmojiError("");
                 setAddError("");
             }}
         >
@@ -110,26 +150,32 @@ export default function Home2() {
                 <form onSubmit={handleAdd} className="mt-4 space-y-4">
                     <fieldset className="fieldset">
                         <legend className="fieldset-legend">Name</legend>
-                        <input
-                            ref={nameInput}
-                            value={name}
-                            onChange={(event) => {
-                                setName(event.target.value);
-                                setAddError("");
-                            }}
-                            type="text"
-                            placeholder="e.g. headphones"
-                            className="input w-full"
-                        />
+                        <div className="flex items-center gap-3">
+                            {/* live preview of the icon the item will get */}
+                            <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-base-300 text-2xl">
+                                {icon}
+                            </div>
+                            <input
+                                ref={nameInput}
+                                value={name}
+                                onChange={(event) => handleNameChange(event.target.value)}
+                                type="text"
+                                placeholder="e.g. headphones"
+                                className="input w-full"
+                            />
+                        </div>
+                        {!pickedIcon && icon !== DEFAULT_ICON && (
+                            <p className="text-xs text-primary">Icon suggested from the name. Pick another below if you like.</p>
+                        )}
                     </fieldset>
                     <fieldset className="fieldset">
                         <legend className="fieldset-legend">Icon</legend>
-                        <div className="grid grid-cols-6 gap-2">
-                            {ICONS.map((choice) => (
+                        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                            {QUICK_PICKS.map((choice) => (
                                 <button
                                     key={choice}
                                     type="button"
-                                    onClick={() => setIcon(choice)}
+                                    onClick={() => pickIcon(choice)}
                                     aria-pressed={icon === choice}
                                     className={`btn btn-square text-xl ${icon === choice ? "border-primary bg-primary/15" : "border-transparent bg-base-300"}`}
                                 >
@@ -137,6 +183,20 @@ export default function Home2() {
                                 </button>
                             ))}
                         </div>
+                        <div className="mt-2 flex items-center gap-3">
+                            <input
+                                value={customEmoji}
+                                onChange={(event) => handleCustomEmojiChange(event.target.value)}
+                                type="text"
+                                placeholder="🙂"
+                                aria-label="Any emoji"
+                                className={`input w-20 text-center text-xl ${emojiError ? "input-error" : ""}`}
+                            />
+                            <p className="text-xs text-base-content/60">
+                                Or use any emoji. {emojiKeyboardHint()}
+                            </p>
+                        </div>
+                        {emojiError && <p role="alert" className="text-xs text-error">{emojiError}</p>}
                     </fieldset>
                     {addError && <p role="alert" className="text-sm text-error">{addError}</p>}
                     <div className="modal-action">
