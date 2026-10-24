@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { addItem, getItems, updateItem } from "../data";
-import { photoToDataUrl } from "../image";
+import { photoToBlob } from "../image";
 import { getCurrentLocation } from "../location";
+import { deletePhoto, loadPhoto, savePhoto } from "../photos";
 import { ArrowLeftIcon, CameraIcon, PencilIcon, TrashIcon } from "../icons";
 
 export default function ItemPage() {
@@ -30,14 +31,17 @@ function ItemView({ v }) {
     const lastLocation = item.img.find((img) => img.location)?.location;
 
     async function saveImage(photo) {
-        const [src, location] = await Promise.all([
-            photoToDataUrl(photo),
+        const [blob, location] = await Promise.all([
+            photoToBlob(photo),
             locationRequest.current ?? getCurrentLocation(),
         ]);
         locationRequest.current = null;
+        // the photo goes in IndexedDB; the item only keeps its id
+        const id = crypto.randomUUID();
+        await savePhoto(id, blob);
         const timestamp = new Date();
         const updates = {
-            img: [{ src, location, timestamp: timestamp.toISOString() }, ...item.img],
+            img: [{ id, location, timestamp: timestamp.toISOString() }, ...item.img],
             date: timestamp,
         };
 
@@ -86,11 +90,15 @@ function ItemView({ v }) {
             return;
         }
 
+        const removed = item.img[imageIndexToDelete];
         const updatedItem = updateItem(v, {
             img: item.img.filter((_, index) => index !== imageIndexToDelete),
         });
         if (updatedItem) {
             setItem(updatedItem);
+            if (removed.id) {
+                deletePhoto(removed.id).catch(() => {});
+            }
         }
         deleteImageDialog.current?.close();
     }
@@ -161,9 +169,9 @@ function ItemView({ v }) {
                     </li>
                 )}
                 {item.img.map((img, index) => (
-                    <li key={`${img.src}-${index}`} className="relative overflow-hidden rounded-box border border-base-content/10 bg-base-200">
-                        <img
-                            src={img.src}
+                    <li key={img.id ?? `${img.src}-${index}`} className="relative overflow-hidden rounded-box border border-base-content/10 bg-base-200">
+                        <StoredPhoto
+                            photo={img}
                             alt={`${item.name}, saved location ${index + 1}`}
                             className="aspect-[4/3] w-full bg-base-300 object-cover"
                         />
@@ -271,4 +279,34 @@ function ItemView({ v }) {
             </dialog>
         </div>
     );
+}
+
+// Shows one saved photo. New photos are loaded from IndexedDB by their id;
+// older ones still have a src (a web address) and show directly.
+function StoredPhoto({ photo, ...imgProps }) {
+    const [url, setUrl] = useState(photo.src);
+
+    useEffect(() => {
+        if (!photo.id) {
+            return;
+        }
+        let objectUrl = null;
+        let cancelled = false;
+        loadPhoto(photo.id).then((blob) => {
+            if (blob && !cancelled) {
+                // gives the Blob a temporary address an <img> can show
+                objectUrl = URL.createObjectURL(blob);
+                setUrl(objectUrl);
+            }
+        });
+        // when the photo leaves the page, free that temporary address
+        return () => {
+            cancelled = true;
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [photo.id]);
+
+    return <img src={url} {...imgProps} />;
 }

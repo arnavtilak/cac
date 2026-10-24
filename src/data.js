@@ -1,3 +1,5 @@
+import { deletePhoto, savePhoto } from "./photos";
+
 // starter items for someone opening LastLook for the first time
 export const ITEMS = [
     { name: "key", icon: "🔑" },
@@ -10,8 +12,9 @@ export const ITEMS = [
 
 const STORAGE_KEY = "lastlook-items";
 
-// Each photo is stored as { src, location: { lat, lng, accuracy } | null, timestamp }.
-// Older records stored photos as plain URL strings, so convert those on read.
+// Each photo is stored as { id, location: { lat, lng, accuracy } | null, timestamp },
+// where id points to the image in IndexedDB (see photos.js).
+// Older records have { src } instead of an id, or are plain URL strings, so convert those on read.
 function normalizeItem(item) {
     return {
         ...item,
@@ -67,5 +70,43 @@ export function updateItem(name, updates) {
 
 // names are unique (they're used in the item's URL), so the name is enough to find it
 export function deleteItem(name) {
-    return saveItems(getItems().filter((item) => item.name !== name));
+    const items = getItems();
+    // also remove this item's photos from IndexedDB so they don't take up space
+    items
+        .find((item) => item.name === name)
+        ?.img.forEach((img) => img.id && deletePhoto(img.id).catch(() => {}));
+    return saveItems(items.filter((item) => item.name !== name));
+}
+
+// Older versions kept each photo inside localStorage as a data URL, which fills it up fast.
+// This moves those photos into IndexedDB and keeps only their ids in localStorage.
+// It runs once at startup; after that there's nothing left to move.
+export async function movePhotosToIndexedDB() {
+    for (const item of getItems()) {
+        if (!item.img.some((img) => img.src?.startsWith("data:"))) {
+            continue;
+        }
+
+        const img = [];
+        for (const photo of item.img) {
+            if (!photo.src?.startsWith("data:")) {
+                img.push(photo);
+                continue;
+            }
+            try {
+                // fetch turns a data URL back into a Blob
+                const blob = await (await fetch(photo.src)).blob();
+                const id = crypto.randomUUID();
+                await savePhoto(id, blob);
+                // keep the location and time, swap src for the id
+                const moved = { ...photo, id };
+                delete moved.src;
+                img.push(moved);
+            } catch {
+                // if it can't be moved, leave it where it is; it still displays fine
+                img.push(photo);
+            }
+        }
+        updateItem(item.name, { img });
+    }
 }

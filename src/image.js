@@ -1,4 +1,5 @@
-export async function photoToDataUrl(file) {
+// Draws the photo onto a canvas, shrunk so its longest side is at most 1280px.
+async function drawResized(file) {
     if (!file.type.startsWith("image/")) {
         throw new Error("Choose an image file.");
     }
@@ -21,5 +22,23 @@ export async function photoToDataUrl(file) {
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
 
+    return canvas;
+}
+
+// Used by the old home page, which stores photos as text.
+export async function photoToDataUrl(file) {
+    const canvas = await drawResized(file);
     return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+// A Blob is the raw image file, about 25% smaller than the same photo as a data URL.
+export async function photoToBlob(file) {
+    const canvas = await drawResized(file);
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(
+            (blob) => (blob ? resolve(blob) : reject(new Error("Could not process this image."))),
+            "image/jpeg",
+            0.82,
+        );
+    });
 }
