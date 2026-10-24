@@ -241,6 +241,8 @@ function ItemView({ v }) {
                                 {img.location
                                     ? `${img.location.lat.toFixed(5)}, ${img.location.lng.toFixed(5)}`
                                     : "No location"}
+                                {/* accuracy is how far off the position might be, in meters */}
+                                {img.location?.accuracy ? ` · ±${Math.round(img.location.accuracy)} m` : ""}
                             </p>
                         </div>
                         {index === 0 && <span className="badge badge-primary badge-sm absolute left-3 top-3 font-semibold">Latest</span>}
