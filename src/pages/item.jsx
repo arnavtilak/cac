@@ -22,6 +22,8 @@ function ItemView({ v }) {
     const [imageIndexToDelete, setImageIndexToDelete] = useState(null);
     const [newName, setNewName] = useState(item.name);
     const photoInput = useRef(null);
+    // location lookup started when the camera button is tapped
+    const locationRequest = useRef(null);
     const deleteImageDialog = useRef(null);
 
     // photos are stored newest first, so this is the most recent stored position
@@ -30,8 +32,9 @@ function ItemView({ v }) {
     async function saveImage(photo) {
         const [src, location] = await Promise.all([
             photoToDataUrl(photo),
-            getCurrentLocation(),
+            locationRequest.current ?? getCurrentLocation(),
         ]);
+        locationRequest.current = null;
         const timestamp = new Date();
         const updates = {
             img: [{ src, location, timestamp: timestamp.toISOString() }, ...item.img],
@@ -192,7 +195,12 @@ function ItemView({ v }) {
             </ul>
             <button
                 className="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-10 shadow-xl shadow-primary/40"
-                onClick={() => photoInput.current?.click()}
+                onClick={() => {
+                    // start finding your location now, while you take or pick the photo,
+                    // so it's usually ready by the time the photo is chosen
+                    locationRequest.current = getCurrentLocation();
+                    photoInput.current?.click();
+                }}
                 disabled={isAddingImage}
                 aria-label="Add a photo"
             >
