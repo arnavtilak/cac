@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { addItem, getItems, updateItem } from "../data";
 import { photoToDataUrl } from "../image";
 import { getCurrentLocation } from "../location";
+import { ArrowLeftIcon, CameraIcon, PencilIcon, TrashIcon } from "../icons";
 
 export default function ItemPage() {
     const { v } = useParams();
@@ -137,10 +138,21 @@ function ItemView({ v }) {
 
     return (
         <div className="flex-grow flex flex-col items-center relative">
-            <header className="w-full max-w-3xl px-4 pt-8 pb-5">
-                <p className="text-sm font-medium text-info">LastLook item</p>
-                <h1 className="mt-1 text-3xl font-bold">{item.name} <button onClick={() => document.getElementById('my_modal_3').showModal()} className="btn btn-warning btn-xs">Edit</button></h1>
-                <p className="mt-2 text-sm text-base-content/70">
+            <header className="w-full max-w-3xl px-4 pt-6 pb-5">
+                <Link to="/" className="inline-flex items-center gap-1 text-sm text-base-content/60 transition hover:text-primary">
+                    <ArrowLeftIcon className="size-4" /> All items
+                </Link>
+                <h1 className="mt-3 flex items-center gap-2 text-4xl font-extrabold tracking-tight capitalize">
+                    {item.name}
+                    <button
+                        onClick={() => document.getElementById('my_modal_3').showModal()}
+                        className="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-primary"
+                        aria-label="Edit name"
+                    >
+                        <PencilIcon className="size-4" />
+                    </button>
+                </h1>
+                <p className="mt-1 text-sm text-base-content/60">
                     {item.date ? (
                         <>
                             Last seen{" "}
@@ -158,48 +170,57 @@ function ItemView({ v }) {
                 </p>
                 <div className="mt-5">
                     {lastLocation ? (
-                        <iframe
-                            title={`Map of where ${item.name} was last seen`}
-                            src={`https://maps.google.com/maps?q=${lastLocation.lat},${lastLocation.lng}&z=17&output=embed`}
-                            className="h-72 w-full rounded-box"
-                            style={{ border: 0 }}
-                            loading="lazy"
-                            referrerPolicy="strict-origin-when-cross-origin"
-                        ></iframe>
+                        <div className="relative overflow-hidden rounded-box border border-base-content/10 shadow-xl shadow-black/30">
+                            {/* invert + hue-rotate turns the light Google map into a dark one */}
+                            <iframe
+                                title={`Map of where ${item.name} was last seen`}
+                                src={`https://maps.google.com/maps?q=${lastLocation.lat},${lastLocation.lng}&z=17&output=embed`}
+                                className="h-72 w-full [filter:invert(90%)_hue-rotate(180deg)]"
+                                style={{ border: 0 }}
+                                loading="lazy"
+                                referrerPolicy="strict-origin-when-cross-origin"
+                            ></iframe>
+                            <span className="badge badge-primary absolute left-3 top-3 font-semibold shadow">Last known spot</span>
+                        </div>
                     ) : (
-                        <div className="flex h-24 w-full items-center justify-center rounded-box bg-base-200 text-sm text-base-content/70">
+                        <div className="flex h-28 w-full items-center justify-center rounded-box border border-dashed border-base-content/20 bg-base-200/50 text-sm text-base-content/60">
                             No location saved yet
                         </div>
                     )}
                 </div>
                 {cameraError && <p role="alert" className="mt-3 text-sm text-error">{cameraError}</p>}
-                <h2 className="mt-7 border-b border-base-300 pb-2 text-lg font-semibold">
+                <h2 className="mt-8 flex items-center gap-2 text-lg font-bold">
                     Saved locations
+                    <span className="badge badge-sm badge-neutral">{item.img.length}</span>
                 </h2>
             </header>
-            <ul className="flex w-full max-w-3xl flex-col gap-4 px-4 pb-24">
+            <ul className="grid w-full max-w-3xl gap-4 px-4 pb-28 sm:grid-cols-2">
                 {item.img.length === 0 && (
-                    <li className="py-8 text-center text-sm text-base-content/70">
-                        No photos yet. Press + to add one.
+                    <li className="rounded-box border border-dashed border-base-content/20 py-10 text-center text-sm text-base-content/60 sm:col-span-2">
+                        No photos yet. Tap the camera button to add one.
                     </li>
                 )}
                 {item.img.map((img, index) => (
-                    <li key={`${img.src}-${index}`} className="relative w-full">
+                    <li key={`${img.src}-${index}`} className="relative overflow-hidden rounded-box border border-base-content/10 bg-base-200">
                         <img
                             src={img.src}
                             alt={`${item.name}, saved location ${index + 1}`}
-                            className="max-h-[32rem] w-full bg-base-200 object-contain"
+                            className="aspect-[4/3] w-full bg-base-300 object-cover"
                         />
-                        <p className="mt-1 text-xs text-base-content/70">
-                            {img.timestamp ? new Date(img.timestamp).toLocaleString() : "Unknown time"}
-                            {" · "}
-                            {img.location
-                                ? `${img.location.lat.toFixed(5)}, ${img.location.lng.toFixed(5)}`
-                                : "No location"}
-                        </p>
+                        <div className="p-3">
+                            <p className="text-sm font-semibold">
+                                {img.timestamp ? new Date(img.timestamp).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Unknown time"}
+                            </p>
+                            <p className="mt-0.5 font-mono text-xs text-base-content/50">
+                                {img.location
+                                    ? `${img.location.lat.toFixed(5)}, ${img.location.lng.toFixed(5)}`
+                                    : "No location"}
+                            </p>
+                        </div>
+                        {index === 0 && <span className="badge badge-primary badge-sm absolute left-3 top-3 font-semibold">Latest</span>}
                         <button
                             type="button"
-                            className="btn btn-error btn-sm absolute right-3 top-3"
+                            className="btn btn-circle btn-sm absolute right-3 top-3 border-0 bg-base-100/70 backdrop-blur hover:bg-error hover:text-error-content"
                             aria-label={`Delete image ${index + 1}`}
                             disabled={item.img.length <= 1}
                             onClick={() => {
@@ -207,13 +228,18 @@ function ItemView({ v }) {
                                 deleteImageDialog.current?.showModal();
                             }}
                         >
-                            Delete
+                            <TrashIcon className="size-4" />
                         </button>
                     </li>
                 ))}
             </ul>
-            <button className="btn btn-info btn-circle absolute bottom-24 right-5" onClick={openAddImage} disabled={isAddingImage}>
-                {isAddingImage ? <span className="loading loading-spinner loading-sm"></span> : "+"}
+            <button
+                className="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-10 shadow-xl shadow-primary/40"
+                onClick={openAddImage}
+                disabled={isAddingImage}
+                aria-label="Add a photo"
+            >
+                {isAddingImage ? <span className="loading loading-spinner loading-sm"></span> : <CameraIcon className="size-6" />}
             </button>
             {/* capture opens the camera on phones; browsers without one fall back to a file picker */}
             <input
@@ -268,7 +294,7 @@ function ItemView({ v }) {
                             />
                         </label>
                         {imageError && <p role="alert" className="text-sm text-error">{imageError}</p>}
-                        <button type="submit" className="btn btn-info" disabled={isAddingImage}>
+                        <button type="submit" className="btn btn-primary" disabled={isAddingImage}>
                             {isAddingImage ? "Adding..." : "Add photo"}
                         </button>
                     </form>
@@ -322,7 +348,7 @@ function ItemView({ v }) {
                                 className="input input-bordered w-full"
                             />
                         </label>
-                        <button type="submit" className="btn btn-info">
+                        <button type="submit" className="btn btn-primary">
                             Save
                         </button>
                     </form>
@@ -333,11 +359,6 @@ function ItemView({ v }) {
                     </div>
                 </div>
             </dialog>
-            <nav className="p-5 space-x-3 flex justify-center w-full bg-base-300">
-                <Link to="/">
-                    <button className="btn btn-ghost">Home</button>
-                </Link>
-            </nav>
         </div>
     );
 }
