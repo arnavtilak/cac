@@ -17,23 +17,19 @@ function ItemView({ v }) {
     const [item, setItem] = useState(
         () => getItems().find((i) => i.name === v) ?? { name: v, img: [], date: null }
     );
-    const [imageUrl, setImageUrl] = useState("");
-    const [selectedPhoto, setSelectedPhoto] = useState(null);
-    const [imageError, setImageError] = useState("");
-    const [cameraError, setCameraError] = useState("");
+    const [photoError, setPhotoError] = useState("");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [imageIndexToDelete, setImageIndexToDelete] = useState(null);
     const [newName, setNewName] = useState(item.name);
     const photoInput = useRef(null);
-    const cameraInput = useRef(null);
     const deleteImageDialog = useRef(null);
 
     // photos are stored newest first, so this is the most recent stored position
     const lastLocation = item.img.find((img) => img.location)?.location;
 
-    async function saveImage(source) {
+    async function saveImage(photo) {
         const [src, location] = await Promise.all([
-            typeof source === "string" ? source : photoToDataUrl(source),
+            photoToDataUrl(photo),
             getCurrentLocation(),
         ]);
         const timestamp = new Date();
@@ -51,61 +47,22 @@ function ItemView({ v }) {
         setItem(updatedItem);
     }
 
-    async function addImage(event) {
-        event.preventDefault();
-        setImageError("");
-
-        if (!imageUrl.trim() && !selectedPhoto) {
-            setImageError("Choose a photo or enter an image URL.");
-            return;
-        }
-        if (imageUrl.trim() && selectedPhoto) {
-            setImageError("Choose a photo or enter a URL, not both.");
-            return;
-        }
-
-        setIsAddingImage(true);
-        try {
-            await saveImage(selectedPhoto ?? imageUrl.trim());
-            setImageUrl("");
-            setSelectedPhoto(null);
-            setImageError("");
-            if (photoInput.current) {
-                photoInput.current.value = "";
-            }
-            document.getElementById("my_modal_2")?.close();
-        } catch {
-            setImageError("Could not save this photo. Try a smaller photo or another image URL.");
-        } finally {
-            setIsAddingImage(false);
-        }
-    }
-
-    async function addCameraPhoto(event) {
+    async function addPhoto(event) {
         const photo = event.target.files?.[0];
+        // clear the input so picking the same photo again still counts as a change
         event.target.value = "";
         if (!photo) {
             return;
         }
 
-        setCameraError("");
+        setPhotoError("");
         setIsAddingImage(true);
         try {
             await saveImage(photo);
         } catch {
-            setCameraError("Could not save this photo. Try again.");
+            setPhotoError("Could not save this photo. Try again.");
         } finally {
             setIsAddingImage(false);
-        }
-    }
-
-    function openAddImage() {
-        // on phones, go straight to the camera; otherwise show the upload dialog
-        const isPhone = window.matchMedia("(pointer: coarse)").matches;
-        if (isPhone && cameraInput.current) {
-            cameraInput.current.click();
-        } else {
-            document.getElementById("my_modal_2").showModal();
         }
     }
 
@@ -188,7 +145,7 @@ function ItemView({ v }) {
                         </div>
                     )}
                 </div>
-                {cameraError && <p role="alert" className="mt-3 text-sm text-error">{cameraError}</p>}
+                {photoError && <p role="alert" className="mt-3 text-sm text-error">{photoError}</p>}
                 <h2 className="mt-8 flex items-center gap-2 text-lg font-bold">
                     Saved locations
                     <span className="badge badge-sm badge-neutral">{item.img.length}</span>
@@ -235,76 +192,21 @@ function ItemView({ v }) {
             </ul>
             <button
                 className="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-10 shadow-xl shadow-primary/40"
-                onClick={openAddImage}
+                onClick={() => photoInput.current?.click()}
                 disabled={isAddingImage}
                 aria-label="Add a photo"
             >
                 {isAddingImage ? <span className="loading loading-spinner loading-sm"></span> : <CameraIcon className="size-6" />}
             </button>
-            {/* capture opens the camera on phones; browsers without one fall back to a file picker */}
+            {/* no capture attribute, so the device shows its own menu:
+                phones offer the camera or the photo library, computers open a file picker */}
             <input
-                ref={cameraInput}
+                ref={photoInput}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
-                onChange={addCameraPhoto}
+                onChange={addPhoto}
             />
-            {/* Open the modal using document.getElementById('ID').showModal() method */}
-            <dialog
-                id="my_modal_2"
-                className="modal"
-                onClose={() => {
-                    setImageUrl("");
-                    setSelectedPhoto(null);
-                    setImageError("");
-                    if (photoInput.current) {
-                        photoInput.current.value = "";
-                    }
-                }}
-            >
-                <div className="modal-box">
-                    <h3 className="font-bold text-lg">Add a saved location</h3>
-                    <form onSubmit={addImage} className="mt-4 space-y-4">
-                        <label className="form-control w-full">
-                            <span className="label-text mb-2">Choose from your device</span>
-                            <input
-                                ref={photoInput}
-                                type="file"
-                                accept="image/*"
-                                className="file-input file-input-bordered w-full"
-                                onChange={(event) => {
-                                    setSelectedPhoto(event.target.files?.[0] ?? null);
-                                    setImageError("");
-                                }}
-                            />
-                        </label>
-                        <div className="divider">OR</div>
-                        <label className="form-control w-full">
-                            <span className="label-text mb-2">Use an image URL</span>
-                            <input
-                                value={imageUrl}
-                                onChange={(event) => {
-                                    setImageUrl(event.target.value);
-                                    setImageError("");
-                                }}
-                                type="url"
-                                placeholder="https://example.com/photo.jpg"
-                                className="input input-bordered w-full"
-                            />
-                        </label>
-                        {imageError && <p role="alert" className="text-sm text-error">{imageError}</p>}
-                        <button type="submit" className="btn btn-primary" disabled={isAddingImage}>
-                            {isAddingImage ? "Adding..." : "Add photo"}
-                        </button>
-                    </form>
-                    <div className="modal-action">
-                        <form method="dialog">
-                            <button type="submit" className="btn">Close</button>
-                        </form>
-                    </div>
-                </div>
-            </dialog>
             <dialog
                 ref={deleteImageDialog}
                 className="modal"
