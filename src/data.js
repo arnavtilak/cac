@@ -1,9 +1,11 @@
+// starter items for someone opening LastLook for the first time
 export const ITEMS = [
-    {
-        img: ["https://images.unsplash.com/photo-1636572481914-a07d36917486?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", "https://images.unsplash.com/photo-1595147389795-37094173bfd8?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8aW1hZ2V8ZW58MHx8MHx8fDA%3D", "https://images.unsplash.com/photo-1633265486064-086b219458ec?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", "https://images.unsplash.com/photo-1642364575782-b570e8a534b0?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjR8fGltYWdlfGVufDB8fDB8fHww"],
-        name: "goggles",
-        date: new Date("2026-10-01")
-    },
+    { name: "key", icon: "🔑" },
+    { name: "wallet", icon: "👛" },
+    { name: "card", icon: "💳" },
+    { name: "phone", icon: "📱" },
+    { name: "laptop", icon: "💻" },
+    { name: "tablet", icon: "📱" },
 ]
 
 const STORAGE_KEY = "lastlook-items";
@@ -13,8 +15,11 @@ const STORAGE_KEY = "lastlook-items";
 function normalizeItem(item) {
     return {
         ...item,
+        // records saved before items had icons borrow the starter icon, or get a box
+        icon: item.icon ?? ITEMS.find((starter) => starter.name === item.name)?.icon ?? "📦",
         img: (item.img ?? []).map((img) => (typeof img === "string" ? { src: img } : img)),
-        date: new Date(item.date),
+        // items with no photos yet have no date
+        date: item.date ? new Date(item.date) : null,
     };
 }
 
@@ -60,16 +65,7 @@ export function updateItem(name, updates) {
     return updatedItem;
 }
 
-export function deleteItem(itemToDelete) {
-    const items = getItems();
-    const itemIndex = items.findIndex((item) =>
-        item.name === itemToDelete.name &&
-        item.date.getTime() === itemToDelete.date.getTime()
-    );
-    if (itemIndex === -1) {
-        return items;
-    }
-
-    items.splice(itemIndex, 1);
-    return saveItems(items);
+// names are unique (they're used in the item's URL), so the name is enough to find it
+export function deleteItem(name) {
+    return saveItems(getItems().filter((item) => item.name !== name));
 }

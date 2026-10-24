@@ -62,7 +62,7 @@ export default function HomePage() {
 
   function confirmDelete() {
     if (itemToDelete) {
-      setItems(removeItem(itemToDelete));
+      setItems(removeItem(itemToDelete.name));
     }
     deleteDialog.current?.close();
   }
@@ -73,7 +73,7 @@ export default function HomePage() {
       <div className="space-y-5 px-5">
         {items.map((item) => (
           <Item
-            key={`${item.name}-${item.date.getTime()}`}
+            key={item.name}
             item={item}
             onDelete={() => {
               setItemToDelete(item);
@@ -214,7 +214,7 @@ function Item({ item, onDelete }) {
         </figure>
         <div className="card-body">
           <h2 className="card-title">{item.name}</h2>
-          <div>{item.date.toLocaleDateString()}</div>
+          <div>{item.date?.toLocaleDateString()}</div>
           <div className="h2">
             Here is where you last left it, if its not there click on the photo
             and check where else you might've left it recently.
